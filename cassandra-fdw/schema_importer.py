@@ -2,14 +2,14 @@ from cassandra.metadata import Metadata
 from cassandra.cluster import Cluster
 from multicorn import TableDefinition, ColumnDefinition
 from cassandra.auth import PlainTextAuthProvider
-import types_mapper
-import logger
-from logger import WARNING, ERROR
-from properties import ISDEBUG
+from . import types_mapper
+from . import logger
+from .logger import WARNING, ERROR
+from .properties import ISDEBUG
 
 def import_schema(schema, srv_options, options, restriction_type, restricts):
     if ISDEBUG:
-        logger.log(u"import schema {0} requiested with options {1}; restriction type: {2}; restrictions: {3}".format(schema, options, restriction_type, restricts))
+        logger.log("import schema {0} requiested with options {1}; restriction type: {2}; restrictions: {3}".format(schema, options, restriction_type, restricts))
     if "hosts" not in srv_options:
         logger.log("The hosts parameter is needed, setting to localhost.", WARNING)
     hosts = srv_options.get("hosts", "localhost").split(",")

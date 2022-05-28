@@ -6,17 +6,17 @@ from cassandra.query import SimpleStatement, ValueSequence
 from collections import defaultdict
 from cassandra.auth import PlainTextAuthProvider
 from datetime import datetime, date, time, timedelta
-from cStringIO import StringIO
+from io import StringIO
 import time
 import math
 import json
-import types_mapper
-import cassandra_types
-import logger
+from . import types_mapper
+from . import cassandra_types
+from . import logger
 import operator
-import properties
-from logger import ERROR, WARNING, INFO, DEBUG
-from properties import ISDEBUG
+from . import properties
+from .logger import ERROR, WARNING, INFO, DEBUG
+from .properties import ISDEBUG
 from cassandra.concurrent import execute_concurrent
 
 
@@ -26,7 +26,7 @@ class CassandraProvider:
     IDX_QUERY_COST = 1000
     CLUSTERING_KEY_QUERY_COST = 100
     PARTITION_KEY_QUERY_COST = 1
-    ROWIDCOLUMN = u"__rowid__"
+    ROWIDCOLUMN = "__rowid__"
     
     def __init__(self, options, columns):
         start_time = time.time()
@@ -78,8 +78,8 @@ class CassandraProvider:
             self.session.default_timeout = float(timeout)
 
     def prepare_insert_stmt(self):
-        insert_stmt_str = u"INSERT INTO {0}.{1} ({2}) VALUES ({3})".format(
-            self.keyspace, self.columnfamily, u",".join(self.queryableColumns), u",".join([u"?"] * len(self.queryableColumns)))
+        insert_stmt_str = "INSERT INTO {0}.{1} ({2}) VALUES ({3})".format(
+            self.keyspace, self.columnfamily, ",".join(self.queryableColumns), ",".join(["?"] * len(self.queryableColumns)))
         if self.ttl != 0:
             insert_stmt_str += " USING TTL {0}".format(self.ttl)
         if ISDEBUG:
@@ -91,7 +91,7 @@ class CassandraProvider:
             logger.log("insert statement prepared in {0} ms".format((time.time() - st) * 1000))
 
     def prepare_delete_stmt(self):
-        delete_stmt_str = u"DELETE FROM {0}.{1} WHERE {2};".format(self.keyspace, self.columnfamily, u" AND ".join(map(lambda str: str + u" = ?", self.rowIdColumns)))
+        delete_stmt_str = "DELETE FROM {0}.{1} WHERE {2};".format(self.keyspace, self.columnfamily, " AND ".join([str + " = ?" for str in self.rowIdColumns]))
         if ISDEBUG:
             logger.log("preparing delete statement")
             st = time.time()
@@ -231,7 +231,7 @@ class CassandraProvider:
         if self.delete_stmt is None:
             self.prepare_delete_stmt()
         if ISDEBUG:
-            logger.log(u"requested delete for id: {0}".format(rowid))
+            logger.log("requested delete for id: {0}".format(rowid))
         values = self.get_delete_args(rowid)
         if ISDEBUG:
             st = time.time()
@@ -257,7 +257,7 @@ class CassandraProvider:
             for col in self.rowIdColumns:
                 if col not in filteredColumns:
                     filteredColumns.append(col)
-            stmt_str.write(u"SELECT {0} FROM {1}.{2}".format(",".join(map(lambda c: '"{0}"'.format(c), filteredColumns)), self.keyspace, self.columnfamily))
+            stmt_str.write("SELECT {0} FROM {1}.{2}".format(",".join(['"{0}"'.format(c) for c in filteredColumns]), self.keyspace, self.columnfamily))
             isWhere = None
             eqRestricted = None
             rangeUsed = False
@@ -280,7 +280,7 @@ class CassandraProvider:
                 for i in range(0, len(self.rowIdColumns)):
                     columnName = self.rowIdColumns[i]
                     binding_values.append(types_mapper.map_object_to_type(ids[i], self.columnsTypes[columnName]))
-                stmt_str.write(u" WHERE {0}".format(u" AND ".join(map(lambda str: str + u" = " + formatting_str, self.rowIdColumns))))
+                stmt_str.write(" WHERE {0}".format(" AND ".join([str + " = " + formatting_str for str in self.rowIdColumns])))
             else:
                 sortedQuals = sorted(quals, key=lambda qual: qual.componentIdx)
                 last_clustering_key_idx = 0
@@ -289,7 +289,7 @@ class CassandraProvider:
                     if qual.componentIdx < self.IDX_QUERY_COST and qual.value is None:
                         return None
                     if ISDEBUG or verbose:
-                        logger.log(u"qual field {0}; qual index {1}; qual type {2}; qual operator: {4}; qual value {3}".format(qual.field_name, qual.componentIdx, type(qual.operator), qual.value, qual.operator))
+                        logger.log("qual field {0}; qual index {1}; qual type {2}; qual operator: {4}; qual value {3}".format(qual.field_name, qual.componentIdx, type(qual.operator), qual.value, qual.operator))
                     if qual.operator == "=":
                         if (qual.field_name in self.queryableColumns and self.queryableColumns[qual.field_name] != self.REGULAR_QUERY_COST):
                             if self.queryableColumns[qual.field_name] == self.CLUSTERING_KEY_QUERY_COST:
@@ -301,42 +301,42 @@ class CassandraProvider:
                                 usedQuals[qual.field_name] = qual.value
                                 if self.queryableColumns[qual.field_name] == self.CLUSTERING_KEY_QUERY_COST:
                                     last_clustering_key_idx = qual.componentIdx
-                                formatted = u" {0} = {1} ".format(qual.field_name, formatting_str)
+                                formatted = " {0} = {1} ".format(qual.field_name, formatting_str)
                                 binding_values.append(types_mapper.map_object_to_type(qual.value, self.columnsTypes[qual.field_name]))
                                 if isWhere:
-                                    stmt_str.write(u" AND ")
+                                    stmt_str.write(" AND ")
                                     stmt_str.write(formatted)
                                 else:
-                                    stmt_str.write(u" WHERE ")
+                                    stmt_str.write(" WHERE ")
                                     stmt_str.write(formatted)
                                     isWhere = 1
                             elif allow_filtering:
-                                formatted = u" {0} = {1} ".format(qual.field_name, formatting_str)
+                                formatted = " {0} = {1} ".format(qual.field_name, formatting_str)
                                 binding_values.append(types_mapper.map_object_to_type(qual.value, self.columnsTypes[qual.field_name]))
                                 if isWhere:
-                                    stmt_str.write(u" AND ")
+                                    stmt_str.write(" AND ")
                                     stmt_str.write(formatted)
                                 else:
-                                    stmt_str.write(u" WHERE ")
+                                    stmt_str.write(" WHERE ")
                                     stmt_str.write(formatted)
                                     isWhere = 1
                         elif allow_filtering:
-                            formatted = u" {0} = {1} ".format(qual.field_name, formatting_str)
+                            formatted = " {0} = {1} ".format(qual.field_name, formatting_str)
                             binding_values.append(types_mapper.map_object_to_type(qual.value, self.columnsTypes[qual.field_name]))
                             if isWhere:
-                                stmt_str.write(u" AND ")
+                                stmt_str.write(" AND ")
                                 stmt_str.write(formatted)
                             else:
-                                stmt_str.write(u" WHERE ")
+                                stmt_str.write(" WHERE ")
                                 stmt_str.write(formatted)
                                 isWhere = 1
                     # IN operator
-                    elif qual.operator == (u"=", True):
+                    elif qual.operator == ("=", True):
                         if (qual.field_name in self.queryableColumns):
                             if (self.queryableColumns[qual.field_name] == self.CLUSTERING_KEY_QUERY_COST or self.queryableColumns[qual.field_name] == self.PARTITION_KEY_QUERY_COST):
                                 if (qual.field_name not in usedQuals and not eqRestricted and not rangeUsed):
                                     usedQuals[qual.field_name] = qual.value
-                                    formatted = u"{0} IN {1}".format(qual.field_name, formatting_str)
+                                    formatted = "{0} IN {1}".format(qual.field_name, formatting_str)
                                     binding_value = []
                                     for el in qual.value:
                                         binding_value.append(types_mapper.map_object_to_type(el, self.columnsTypes[qual.field_name]))
@@ -346,10 +346,10 @@ class CassandraProvider:
                                         binding_values.append(ValueSequence(binding_value))
 
                                     if isWhere:
-                                        stmt_str.write(u" AND ")
+                                        stmt_str.write(" AND ")
                                         stmt_str.write(formatted)
                                     else:
-                                        stmt_str.write(u" WHERE ")
+                                        stmt_str.write(" WHERE ")
                                         stmt_str.write(formatted)
                                         isWhere = 1
                     elif (qual.operator == "~" or qual.operator == "~~") and qual.field_name in self.indexes and self.indexes[qual.field_name] == "org.apache.cassandra.index.sasi.SASIIndex":
@@ -357,7 +357,7 @@ class CassandraProvider:
                             val = "%{0}%".format(qual.value)
                         else:
                             val = qual.value
-                        stmt_str.write(u" AND {0} LIKE {1}".format(qual.field_name, formatting_str))
+                        stmt_str.write(" AND {0} LIKE {1}".format(qual.field_name, formatting_str))
                         binding_values.append(types_mapper.map_object_to_type(val, self.columnsTypes[qual.field_name]))
                     else:
                         if (qual.operator == ">" or qual.operator == "<" or qual.operator == ">=" or qual.operator == "<="):
@@ -368,21 +368,21 @@ class CassandraProvider:
                             or (allow_filtering and self.queryableColumns[qual.field_name] != self.PARTITION_KEY_QUERY_COST)):
                                 rangeUsed = True
                                 if isWhere:
-                                    stmt_str.write(u" AND {0} {1} {2}".format(qual.field_name, qual.operator, formatting_str))
+                                    stmt_str.write(" AND {0} {1} {2}".format(qual.field_name, qual.operator, formatting_str))
                                     binding_values.append(types_mapper.map_object_to_type(qual.value, self.columnsTypes[qual.field_name]))
                                 else:
-                                    stmt_str.write(u" WHERE {0} {1} {2}".format(qual.field_name, qual.operator, formatting_str))
+                                    stmt_str.write(" WHERE {0} {1} {2}".format(qual.field_name, qual.operator, formatting_str))
                                     isWhere = 1
                                     binding_values.append(types_mapper.map_object_to_type(qual.value, self.columnsTypes[qual.field_name]))
 
         if (self.limit):
-            stmt_str.write(u" LIMIT {0}".format(self.limit))
+            stmt_str.write(" LIMIT {0}".format(self.limit))
         if allow_filtering:
-            stmt_str.write(u" ALLOW FILTERING ")
+            stmt_str.write(" ALLOW FILTERING ")
         statement = stmt_str.getvalue()
         stmt_str.close()
         if ISDEBUG:
-            logger.log(u"CQL query: {0}".format(statement), INFO)
+            logger.log("CQL query: {0}".format(statement), INFO)
         return (statement, binding_values, filteredColumns)
 
 
@@ -399,30 +399,30 @@ class CassandraProvider:
         if self.prepare_select_stmt:
             if stmt not in self.prepared_select_stmts:
                 if ISDEBUG:
-                    logger.log(u"preparing statement...")
+                    logger.log("preparing statement...")
                 self.prepared_select_stmts[stmt] = self.session.prepare(stmt)
             elif ISDEBUG:
-                    logger.log(u"statement already prepared")
+                    logger.log("statement already prepared")
         if ISDEBUG:
-            logger.log(u"executing statement...")
+            logger.log("executing statement...")
             st = time.time()
         elif self.enable_trace:
-            logger.log(u"executing statement '{0}'".format(stmt))
+            logger.log("executing statement '{0}'".format(stmt))
         if self.prepare_select_stmt:
             result = self.session.execute(self.prepared_select_stmts[stmt], binding_values)
         else:
             result = self.session.execute(SimpleStatement(stmt), binding_values)
         if ISDEBUG:
-            logger.log(u"cursor got in {0} ms".format((time.time() - st) * 1000))
+            logger.log("cursor got in {0} ms".format((time.time() - st) * 1000))
         for row in result:
             line = {}
             idx = 0
             for column_name in filtered_columns:
                 value = row[idx]
                 if self.columnsTypes[column_name].main_type == cassandra_types.cql_timestamp and value is not None:
-                    line[column_name] = u"{0}+00:00".format(value)
+                    line[column_name] = "{0}+00:00".format(value)
                 elif self.columnsTypes[column_name].main_type == cassandra_types.cql_time and value is not None:
-                    line[column_name] = u"{0}+00:00".format(value)
+                    line[column_name] = "{0}+00:00".format(value)
                 elif isinstance(value, tuple):
                     tuple_values = []
                     for t in value:
@@ -438,13 +438,13 @@ class CassandraProvider:
                 idx = idx + 1
             rowid_values = []
             for idcolumn in self.rowIdColumns:
-                rowid_values.append(unicode(line[idcolumn]))
+                rowid_values.append(str(line[idcolumn]))
             line[self.ROWIDCOLUMN] = json.dumps(rowid_values)
             yield line
 
     def get_row_id_column(self):
         if ISDEBUG:
-            logger.log(u"rowid requested")
+            logger.log("rowid requested")
         return self.ROWIDCOLUMN
 
     def get_rel_size(self, quals, columns):
@@ -467,7 +467,7 @@ class CassandraProvider:
 
     def get_path_keys(self):
         output = []
-        sorted_items = sorted(self.querableColumnsIdx.items(), key=operator.itemgetter(1))
+        sorted_items = sorted(list(self.querableColumnsIdx.items()), key=operator.itemgetter(1))
         clusteting_key_columns = []
         partition_key_columns = []
         idx_columns = []

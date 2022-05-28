@@ -1,9 +1,9 @@
-import time_utils
+from . import time_utils
 from datetime import datetime
 import uuid
 import json
-import cassandra_types
-from cassandra_types import CqlType
+from . import cassandra_types
+from .cassandra_types import CqlType
 from decimal import Decimal
 
 def get_cql_type_from_validator(validator):
@@ -62,7 +62,7 @@ def map_object_to_type(obj, cql_type):
             tuple_idx += 1
         return tuple(lst)
     elif cql_type.main_type == cassandra_types.cql_set:
-        output_set = frozenset(map(lambda t: map_object_to_type(t, cql_type.sub_types[0]), obj))
+        output_set = frozenset([map_object_to_type(t, cql_type.sub_types[0]) for t in obj])
         return output_set
     elif cql_type.main_type == cassandra_types.cql_map:
         map_obj = json.loads(obj)
@@ -73,13 +73,13 @@ def map_object_to_type(obj, cql_type):
             output_dict[key_obj] = value_obj
         return output_dict
     elif cql_type.main_type == cassandra_types.cql_list:
-        list = map(lambda t: map_object_to_type(t, cql_type.sub_types[0]), obj)
+        list = [map_object_to_type(t, cql_type.sub_types[0]) for t in obj]
         return list
     if obj is datetime:
         return obj
     return {
         cassandra_types.cql_uuid: lambda: obj if obj is uuid.UUID else uuid.UUID(obj),
-        cassandra_types.cql_bigint: lambda: obj if obj is long else long(str(obj)),
+        cassandra_types.cql_bigint: lambda: obj if obj is int else int(str(obj)),
         cassandra_types.cql_boolean: lambda: obj if obj is bool else bool(str(obj)),
         cassandra_types.cql_decimal: lambda: obj if obj is Decimal else Decimal(str(obj)),
         cassandra_types.cql_double: lambda: obj if obj is float else float(str(obj)),
@@ -87,12 +87,12 @@ def map_object_to_type(obj, cql_type):
         cassandra_types.cql_int: lambda: obj if obj is int else int(str(obj)),
         cassandra_types.cql_timestamp: lambda: time_utils.parse_date_string(str(obj)),
         cassandra_types.cql_timeuuid: lambda: obj if obj is uuid.UUID else uuid.UUID(str(obj)),
-        cassandra_types.cql_text: lambda: obj if obj is unicode else obj.encode('utf8'),
+        cassandra_types.cql_text: lambda: obj if obj is str else obj.encode('utf8'),
         cassandra_types.cql_inet: lambda: str(obj),
-        cassandra_types.cql_counter: lambda: obj if obj is long else long(str(obj)),
+        cassandra_types.cql_counter: lambda: obj if obj is int else int(str(obj)),
         cassandra_types.cql_varint: lambda: obj if obj is int else int(str(obj)),
-        cassandra_types.cql_blob: lambda: unicode(obj),
-        cassandra_types.cql_ascii: lambda: unicode(obj),
+        cassandra_types.cql_blob: lambda: str(obj),
+        cassandra_types.cql_ascii: lambda: str(obj),
         cassandra_types.cql_tinyint: lambda: obj if obj is int else int(str(obj)),
         cassandra_types.cql_smallint: lambda: obj if obj is int else int(str(obj)),
         cassandra_types.cql_time: lambda: time_utils.parse_time_string(str(obj)),

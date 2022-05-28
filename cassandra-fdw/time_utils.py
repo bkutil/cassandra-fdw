@@ -1,5 +1,5 @@
 from datetime import datetime, date, time, timedelta
-from cStringIO import StringIO
+from io import StringIO
 
 def parse_time_string(str_time):
     mode = 1
@@ -142,7 +142,7 @@ def parse_date_string(str_date):
     return dt - timedelta(hours=tz_hour * tzmode, minutes=tz_minute * tzmode)
 
 def get_tz_time(str_tz_time):
-    parts = str_tz_time.split(u':')
+    parts = str_tz_time.split(':')
     result = {}
     result['hours'] = int(parts[0])
     if len(parts) > 1:

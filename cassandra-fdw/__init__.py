@@ -1,8 +1,8 @@
 from multicorn import ForeignDataWrapper
-from cassandra_provider import CassandraProvider
-from properties import ISDEBUG
-import properties
-import schema_importer
+from .cassandra_provider import CassandraProvider
+from .properties import ISDEBUG
+from . import properties
+from . import schema_importer
 import time
 
 class CassandraFDW(ForeignDataWrapper):
@@ -44,7 +44,7 @@ class CassandraFDW(ForeignDataWrapper):
 
     def update(self, rowid, new_values):
         if ISDEBUG:
-            logger.log(u"requested update {0}".format(new_values))
+            logger.log("requested update {0}".format(new_values))
         self.insert(new_values)
         return new_values
 
